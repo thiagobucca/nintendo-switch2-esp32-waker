@@ -1,0 +1,47 @@
+# Minimal Nintendo Switch 2 waker: one "Wake Switch 2" button in Home Assistant.
+# Replace the two addresses with the values from your own capture
+# (see "Capturing your wake packet" in the README).
+esphome:
+  name: switch2-waker
+  friendly_name: Switch 2 Waker
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://thiagobucca/nintendo-switch2-esp32-waker
+    components: [switch2_wake]
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+# No credentials in YAML: on first boot the board opens a "switch2-waker"
+# access point (captive portal) and also accepts Improv over USB.
+wifi:
+  ap: {}
+
+captive_portal:
+improv_serial:
+
+esp32_ble:
+  id: ble
+
+switch2_wake:
+  id: switch2
+  controller_mac: "AA:BB:CC:DD:EE:01"  # paired Joy-Con 2 / Pro Controller 2
+  console_mac: "AA:BB:CC:DD:EE:02"     # the Switch 2 (from the captured payload)
+  product_id: joycon2_left             # use the product ID from your capture
+
+button:
+  - platform: switch2_wake
+    switch2_wake_id: switch2
+    name: Wake Switch 2

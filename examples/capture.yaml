@@ -1,0 +1,40 @@
+# Capture firmware: logs every Nintendo BLE advertisement (company ID 0x0553)
+# with the sender address. No Home Assistant needed -- watch the logs with
+#   esphome logs capture.yaml
+# Put the Switch 2 to sleep, detach a Joy-Con 2 and press HOME near the ESP32.
+esphome:
+  name: switch2-capture
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+wifi:
+  ap: {}
+
+captive_portal:
+improv_serial:
+
+api:
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            for (auto &md : x.get_manufacturer_datas()) {
+              if (md.uuid != esp32_ble_tracker::ESPBTUUID::from_uint16(0x0553))
+                continue;
+              std::string hex;
+              char byte[4];
+              for (uint8_t b : md.data) {
+                snprintf(byte, sizeof(byte), "%02X", b);
+                hex += byte;
+              }
+              ESP_LOGI("capture", "Nintendo advertisement from %s (RSSI %d): %s",
+                       x.address_str().c_str(), x.get_rssi(), hex.c_str());
+            }

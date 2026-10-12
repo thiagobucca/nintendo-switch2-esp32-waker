@@ -1,0 +1,87 @@
+# Wake the Switch 2 when a non-Nintendo Bluetooth LE controller turns on.
+#
+# Some BLE controllers (e.g. an Xbox Wireless Controller paired with a USB
+# Bluetooth adapter on the dock) broadcast an undirected advertisement while
+# they look for their host. The ESP32 sees it and sends the wake burst, so the
+# console is awake by the time the controller reconnects. Runs on the ESP32
+# itself; Home Assistant is not involved.
+#
+# Bluetooth Classic controllers (most 8BitDo models in Switch mode, the Switch 1
+# Pro Controller) page their host directly and cannot be detected this way.
+esphome:
+  name: switch2-waker
+  friendly_name: Switch 2 Waker
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+external_components:
+  - source: github://thiagobucca/nintendo-switch2-esp32-waker
+    components: [switch2_wake]
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+wifi:
+  ap: {}
+
+captive_portal:
+improv_serial:
+
+esp32_ble:
+  id: ble
+
+switch2_wake:
+  id: switch2
+  controller_mac: "AA:BB:CC:DD:EE:01"
+  console_mac: "AA:BB:CC:DD:EE:02"
+  product_id: joycon2_left
+
+# Passive scanning runs alongside the wake advertisement. The Bluetooth proxy
+# is optional; it lets Home Assistant see nearby BLE devices too.
+esp32_ble_tracker:
+  scan_parameters:
+    active: false
+  on_ble_advertise:
+    - mac_address: "AA:BB:CC:DD:EE:03"  # your controller's Bluetooth address
+      then:
+        - if:
+            condition:
+              switch.is_on: wake_on_controller
+            then:
+              - script.execute: wake_from_controller
+
+bluetooth_proxy:
+  active: false
+
+# The controller advertises repeatedly while it searches for its host.
+# mode: single + delay = at most one burst per minute.
+script:
+  - id: wake_from_controller
+    mode: single
+    then:
+      - logger.log: "Controller is searching for its host, waking the Switch 2"
+      - switch2_wake.send: switch2
+      - delay: 60s
+
+switch:
+  - platform: template
+    id: wake_on_controller
+    name: Wake on controller
+    icon: mdi:microsoft-xbox-controller
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+
+button:
+  - platform: switch2_wake
+    switch2_wake_id: switch2
+    name: Wake Switch 2
